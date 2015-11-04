@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<deploy>
+    <systemSet id="SmartPayDB">
+        <dbType>sybase</dbType>
+        <dbAddress>192.168.169.217</dbAddress>
+        <dbPort>5000</dbPort>
+        <dbName>SmartPayDB</dbName>
+        <dbUser>sa</dbUser>
+        <dbpwd>123456</dbpwd>
+    </systemSet>
+    <systemSet id="mls">
+        <dbType>mssql</dbType>
+        <dbAddress>192.168.169.227</dbAddress>
+        <dbPort>1433</dbPort>
+        <dbName>mls</dbName>
+        <dbUser>sa</dbUser>
+        <dbpwd>123456</dbpwd>
+    </systemSet>
+    <httpPath>http://220.231.153.66:80/ReviveSmartRS/</httpPath>
+    <httpAddress>192.168.169.217</httpAddress>
+    <httpPort>8007</httpPort>
+    <httpTimeOut>30</httpTimeOut>
+</deploy>
