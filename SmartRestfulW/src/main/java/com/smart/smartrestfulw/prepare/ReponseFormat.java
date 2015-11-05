@@ -7,8 +7,7 @@ package com.smart.smartrestfulw.prepare;
 
 import com.smart.common.model.ResponseResultCode;
 import java.io.IOException;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.codehaus.jackson.node.ObjectNode;
+import net.sf.json.JSONObject;
 
 /**
  *
@@ -22,12 +21,11 @@ public class ReponseFormat {
      * @param errMsg
      * @return
      */
-    private ObjectNode formationResult(ResponseResultCode resultCode, String errMsg) {
-        ObjectMapper mapper = new ObjectMapper();
-        ObjectNode node = mapper.createObjectNode();
-        node.put("resultCode", resultCode.toString());
-        node.put("errMsg", errMsg);
-        return node;
+    private JSONObject formationResult(ResponseResultCode resultCode, String errMsg) {
+        JSONObject jsonObject = new JSONObject();
+        jsonObject.accumulate("resultCode", resultCode.toString());
+        jsonObject.accumulate("errMsg", errMsg);
+        return jsonObject;
     }
 
     /**
@@ -36,8 +34,8 @@ public class ReponseFormat {
      * @param errMsg
      * @return
      */
-    private ObjectNode formationResult(ResponseResultCode resultCode, Exception exception) {
-        ObjectNode node = formationResult(resultCode, exception.getLocalizedMessage());
+    private JSONObject formationResult(ResponseResultCode resultCode, Exception exception) {
+        JSONObject node = formationResult(resultCode, exception.getLocalizedMessage());
         com.smart.common.RSLogger.ErrorLogInfo(null, exception);
         return node;
     }
@@ -69,9 +67,9 @@ public class ReponseFormat {
      * @param objectNode
      * @return
      */
-    private ObjectNode formationResult(ResponseResultCode resultCode, String errMsg, ObjectNode objectNode) {
-        ObjectNode node = formationResult(resultCode, errMsg);
-        node.put("result", objectNode);
+    private JSONObject formationResult(ResponseResultCode resultCode, String errMsg, JSONObject objectNode) {
+        JSONObject node = formationResult(resultCode, errMsg);
+        node.accumulate("result", objectNode);
         return node;
     }
 
@@ -82,10 +80,16 @@ public class ReponseFormat {
      * @param objectNode
      * @return
      */
-    public String formationResultToString(ResponseResultCode resultCode, String errMsg, ObjectNode objectNode) throws IOException {
-        ObjectNode node = formationResult(resultCode, errMsg);
-        node.put("result", objectNode);
-        ObjectMapper mapper = new ObjectMapper();
-        return mapper.writeValueAsString(node);
+    public String formationResultToString(ResponseResultCode resultCode, String errMsg, JSONObject objectNode) {
+        return formationResult(resultCode, errMsg, objectNode).toString();
+    }
+
+    /**
+     *
+     * @param objectNode
+     * @return
+     */
+    public String formationSuccessResultToString(JSONObject objectNode) {
+        return formationResult(ResponseResultCode.Success, "", objectNode).toString();
     }
 }

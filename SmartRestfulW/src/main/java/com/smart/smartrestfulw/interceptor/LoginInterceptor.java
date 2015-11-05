@@ -24,12 +24,8 @@ public class LoginInterceptor implements HandlerInterceptor {
 //        ObjectMapper mapper = new ObjectMapper();
 //        mapper.configure(DeserializationConfig.Feature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 //        ReviveRSParamModel paramModel = mapper.readValue(hsr.getInputStream(), ReviveRSParamModel.class);
-        
-//        if (paramModel.token.equals("1111")) {
-//            return true;
-//        } else {
-//            hsr1.setStatus(404);
-//        }
+
+       // System.out.println(hsr.getParameterMap().toString());
         return true;
     }
 

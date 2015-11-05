@@ -3,14 +3,16 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package com.smart.smartrestfulw.paramAnalyze;
+package com.smart.smartrestfulw.controller;
 
-import com.smart.smartrestfulw.paramAnalyze.IAnalyzeReviceParamModel;
 import com.smart.common.DeployInfo;
+import com.smart.common.RSLogger;
 import com.smart.common.UtileSmart;
 import com.smart.common.model.OperateTypeEnum;
+import com.smart.common.model.ReviveRSParamDBLeftLinkModel;
 import com.smart.common.model.ReviveRSParamModel;
 import com.smart.common.model.SignModel;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -22,37 +24,36 @@ import net.sf.json.JSONObject;
  *
  * @author Administrator
  */
-public class AnalyzeReviceParamModel implements IAnalyzeReviceParamModel {
-    
-    @Override
+public class AnalyzeReviceParamModel {
+
     public ReviveRSParamModel transferReviveRSParamModel(String param, OperateTypeEnum operateType) throws Exception {
         ReviveRSParamModel paramModel = null;
-        JSONObject jsonObj = null, jsonBody = null, jsonNote = null, jsonHead = null, jsonValues = null, jsonPkvalue = null;
-        JSONArray url_columns = null, db_columns = null;
+        JSONObject jsonObj = null, jsonBody = null, jsonNote = null, jsonHead = null, jsonValues = null, jsonPkvalue = null, jsonLeftLink = null;
+        JSONArray url_columns = null, db_columns = null, db_leftLink = null, dbll_linkSeekCol = null;
         String strTemp = null;
         Object objPkvalue = null;
         try {
             jsonObj = JSONObject.fromObject(param);
             jsonHead = jsonObj.getJSONObject("head");
             paramModel = new ReviveRSParamModel();
-            paramModel.rsid = UtileSmart.GetJsonString(jsonHead, "RSID");
-            paramModel.token = UtileSmart.GetJsonString(jsonHead, "token");
+            paramModel.rsid = UtileSmart.TryGetJsonString(jsonHead, "RSID");
+            paramModel.token = UtileSmart.TryGetJsonString(jsonHead, "token");
             //file operate
             if (OperateTypeEnum.fileOperate == operateType) {
-                paramModel.handle = UtileSmart.GetJsonString(jsonHead, "handle");
+                paramModel.handle = UtileSmart.TryGetJsonString(jsonHead, "handle");
 // todo    public String fileColumn; //base64，或者上传文件指定保存文件的列名称
             }
             jsonBody = jsonObj.getJSONObject("body");
             jsonNote = jsonBody.getJSONObject("note");
             jsonValues = jsonBody.getJSONObject("values");
-            
-            paramModel.db_tableName = UtileSmart.GetJsonString(jsonNote, DeployInfo.paramTableName);
+
+            paramModel.db_tableName = UtileSmart.TryGetJsonString(jsonNote, DeployInfo.paramTableName);
             //get primary value.if string single clolumn ,if object multi column
             if (jsonNote.containsKey("pkValue")) {
                 objPkvalue = jsonNote.get("pkValue");
                 if (objPkvalue instanceof String) {
                     //String
-                    paramModel.pkValue = UtileSmart.GetJsonString(jsonNote, "pkValue");
+                    paramModel.pkValue = UtileSmart.TryGetJsonString(jsonNote, "pkValue");
                 } else if (objPkvalue instanceof JSONObject) {
                     //jsonObject
                     paramModel.pkValues = new HashMap<String, String>();
@@ -65,29 +66,54 @@ public class AnalyzeReviceParamModel implements IAnalyzeReviceParamModel {
             }
             // select
             if (OperateTypeEnum.select == operateType) {
-                paramModel.sql = UtileSmart.GetJsonString(jsonValues, "sql");
-                paramModel.db_orderBy = UtileSmart.GetJsonString(jsonValues, "db_orderBy");
-                paramModel.db_pageSize = UtileSmart.overrideParseShort(UtileSmart.GetJsonString(jsonNote, "db_pageSize"));
-                paramModel.db_pageNum = UtileSmart.overrideParseInt(UtileSmart.GetJsonString(jsonNote, "db_pageNum"));
-                paramModel.db_skipNum = UtileSmart.overrideParseInt(UtileSmart.GetJsonString(jsonNote, "db_skipNum"));
-                paramModel.db_topNum = UtileSmart.overrideParseShort(UtileSmart.GetJsonString(jsonNote, "db_topNum"));
+                paramModel.sql = UtileSmart.TryGetJsonString(jsonValues, "sql");
+                paramModel.db_orderBy = UtileSmart.TryGetJsonString(jsonValues, "db_orderBy");
+                paramModel.db_pageSize = UtileSmart.overrideParseShort(UtileSmart.TryGetJsonString(jsonNote, "db_pageSize"));
+                paramModel.db_pageNum = UtileSmart.overrideParseInt(UtileSmart.TryGetJsonString(jsonNote, "db_pageNum"));
+                paramModel.db_skipNum = UtileSmart.overrideParseInt(UtileSmart.TryGetJsonString(jsonNote, "db_skipNum"));
+                paramModel.db_topNum = UtileSmart.overrideParseShort(UtileSmart.TryGetJsonString(jsonNote, "db_topNum"));
                 if (jsonNote.containsKey("url_columns")) {
-                    paramModel.db_RULcolumns = new HashSet<String>();
+                    paramModel.db_RULcolumns = new HashSet< String>();
                     url_columns = jsonNote.getJSONArray("url_columns");
                     for (int i = 0; i < url_columns.size(); i++) {
                         paramModel.db_RULcolumns.add(url_columns.getString(i));
                     }
                 }
                 if (jsonNote.containsKey("db_columns")) {
-                    paramModel.db_columns = new HashSet<String>();
+                    paramModel.db_columns = new HashSet< String>();
                     db_columns = jsonNote.getJSONArray("db_columns");
                     for (int i = 0; i < db_columns.size(); i++) {
                         paramModel.db_columns.add(db_columns.getString(i));
                     }
                 }
+
+                //analyze db_leftLink
+                if (jsonNote.containsKey("db_leftLink")) {
+                    paramModel.db_leftLink = new ArrayList<ReviveRSParamDBLeftLinkModel>();
+                    db_leftLink = jsonNote.getJSONArray("db_leftLink");
+                    ReviveRSParamDBLeftLinkModel tempLeftLinkModel = null;
+                    for (int i = 0; i < db_leftLink.size(); i++) {
+                        tempLeftLinkModel = new ReviveRSParamDBLeftLinkModel();
+                        jsonLeftLink = db_leftLink.getJSONObject(i);
+                        tempLeftLinkModel.dbll_tableName = jsonLeftLink.getString("dbll_tableName");
+                        tempLeftLinkModel.dbll_sourceCol = jsonLeftLink.getString("dbll_sourceCol");
+                        tempLeftLinkModel.dbll_linkCol = jsonLeftLink.getString("dbll_linkCol");
+                        dbll_linkSeekCol = jsonLeftLink.getJSONArray("dbll_linkSeekCol");
+                        tempLeftLinkModel.dbll_linkSeekCol = new ArrayList<String>();
+                        for (int j = 0; j < dbll_linkSeekCol.size(); j++) {
+                            tempLeftLinkModel.dbll_linkSeekCol.add(dbll_linkSeekCol.getString(j));
+                        }
+                        paramModel.db_leftLink.add(tempLeftLinkModel);
+                    }
+                }
             }
             // insert or update
             if (OperateTypeEnum.insert == operateType || OperateTypeEnum.update == operateType) {
+                paramModel.treeNId = UtileSmart.TryGetJsonString(jsonNote, "treeNId");
+                paramModel.treeNColumn = UtileSmart.TryGetJsonString(jsonNote, "treeNColumn");
+                paramModel.treeNUpId = UtileSmart.TryGetJsonString(jsonNote, "treeNUpId");
+                paramModel.treeNUpColumn = UtileSmart.TryGetJsonString(jsonNote, "treeNUpColumn");
+
                 paramModel.db_valueColumns = new HashMap<String, String>();
                 Iterator keys = jsonValues.keys();
                 while (keys.hasNext()) {
@@ -108,14 +134,13 @@ public class AnalyzeReviceParamModel implements IAnalyzeReviceParamModel {
             }
             return paramModel;
         } catch (Exception e) {
-            com.smart.common.RSLogger.ErrorLogInfo("transferReviveRSParamModel IAnalyzeReviceParamModel error.strParam:" + param + e.getLocalizedMessage());
+            RSLogger.ErrorLogInfo("transferReviveRSParamModel IAnalyzeReviceParamModel error.strParam:" + param + e.getLocalizedMessage());
             throw new Exception("transferReviveRSParamModel error." + e.getLocalizedMessage());
         } finally {
-            com.smart.common.UtileSmart.FreeObjects(jsonObj, jsonBody, jsonNote, jsonHead, jsonValues, url_columns, db_columns, strTemp, operateType);
+            UtileSmart.FreeObjects(jsonObj, jsonBody, jsonNote, jsonHead, jsonValues, url_columns, db_columns, strTemp, operateType);
         }
     }
-    
-    @Override
+
     public SignModel transferReviveRSSignModel(String param, OperateTypeEnum operateType) throws Exception {
         SignModel signModel = null;
         JSONObject jsonObj = null, jsonBody = null, jsonNote = null, jsonHead = null, jsonValues = null;
@@ -140,10 +165,10 @@ public class AnalyzeReviceParamModel implements IAnalyzeReviceParamModel {
             }
             return signModel;
         } catch (Exception e) {
-            com.smart.common.RSLogger.ErrorLogInfo("transferReviveRSSignModel IAnalyzeReviceParamModel error.strParam:" + param + e.getLocalizedMessage());
+            RSLogger.ErrorLogInfo("transferReviveRSSignModel IAnalyzeReviceParamModel error.strParam:" + param + e.getLocalizedMessage());
             throw new Exception("transferReviveRSSignModel error." + e.getLocalizedMessage());
         } finally {
-            com.smart.common.UtileSmart.FreeObjects(jsonObj, jsonBody, jsonNote, jsonHead, jsonValues, operateType);
+            UtileSmart.FreeObjects(jsonObj, jsonBody, jsonNote, jsonHead, jsonValues, operateType);
         }
     }
 
@@ -162,12 +187,12 @@ public class AnalyzeReviceParamModel implements IAnalyzeReviceParamModel {
         try {
             jsonObj = JSONObject.fromObject(param);
         } finally {
-            com.smart.common.UtileSmart.FreeObjects(jsonObj, jsonBody, jsonNote, jsonHead, jsonValues);
+            UtileSmart.FreeObjects(jsonObj, jsonBody, jsonNote, jsonHead, jsonValues);
         }
         if (isMustSign) {
-            
+
         }
         return jsonObj;
     }
-    
+
 }

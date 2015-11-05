@@ -5,20 +5,17 @@
  */
 package com.smart.smartrestfulw.controller;
 
-import com.smart.smartrestfulw.paramAnalyze.AnalyzeReviceParamModel;
-import com.smart.smartrestfulw.paramAnalyze.IAnalyzeReviceParamModel;
 import com.smart.common.DBHelper;
 import com.smart.common.DeployInfo;
-import com.smart.common.FormationResult;
+import com.smart.common.SignVerify.SignCommon;
+import com.smart.common.SignVerify.SignInformationModel;
 import com.smart.common.model.ExecuteResultParam;
 import com.smart.common.model.ResponseResultCode;
 import com.smart.common.UtileSmart;
 import com.smart.common.model.OperateTypeEnum;
 import com.smart.common.model.ReviveRSParamModel;
 import com.smart.common.model.SqlFactoryResultModel;
-import com.smart.smartrestfulw.paramAnalyze.AnalyzeReviceParamByJackson;
 import com.smart.smartrestfulw.prepare.ReponseFormat;
-import java.math.BigDecimal;
 import java.util.Iterator;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
@@ -30,14 +27,6 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-import java.util.Map;
-import org.codehaus.jackson.JsonFactory;
-import org.codehaus.jackson.JsonGenerator;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.codehaus.jackson.node.ArrayNode;
-import org.codehaus.jackson.node.ObjectNode;
-
 /**
  * REST Web Service
  *
@@ -47,8 +36,9 @@ import org.codehaus.jackson.node.ObjectNode;
 @RequestMapping("/autoOD")
 public class AutoODataController {
 
-    private FormationResult formationResult = new FormationResult();
-    private ReponseFormat responseFormat = new ReponseFormat();
+    //private FormationResult formationResult = new FormationResult();
+    private final ReponseFormat responseFormat = new ReponseFormat();
+    private final AnalyzeReviceParamModel analyzeParamModel = new AnalyzeReviceParamModel();
 
     /**
      * Creates a new instance of ReviveRS
@@ -74,22 +64,23 @@ public class AutoODataController {
 
     @RequestMapping(value = "/test", method = RequestMethod.POST, consumes = {MediaType.APPLICATION_JSON_VALUE}, produces = {MediaType.APPLICATION_JSON_VALUE})
     @ResponseBody
-    public String test(@RequestBody ReviveRSParamModel param) throws Exception {
+    public String test(@RequestBody String param) throws Exception {
         //analyzeParamJackson.transferReviveRSParamModel(param, OperateTypeEnum.update);
         return "test past";
     }
 
     @RequestMapping(value = "/SelectModel", method = RequestMethod.POST, consumes = {MediaType.APPLICATION_JSON_VALUE}, produces = {MediaType.APPLICATION_JSON_VALUE})
     @ResponseBody
-    public ObjectNode SelectModel(@RequestBody ReviveRSParamModel paramModel) {
+    public String SelectModel(@RequestBody String param) {
         ExecuteResultParam resultParam = null, resultParam1 = null;
         String sqlStr = null, sqlStr1 = null;
+        ReviveRSParamModel paramModel = null;
         try {
-//            boolean isSignOn = com.smart.common.VerificationSign.verificationSignOn(paramModel.token, paramModel.rsid);
-//            if (!isSignOn) {
-//                //return formationResult.formationResult(ResponseResultCode.Error, new ExecuteResultParam("请您先登录系统。", param));
-//                return null;
-//            }
+            paramModel = analyzeParamModel.transferReviveRSParamModel(param, OperateTypeEnum.select);
+            SignInformationModel signModel = SignCommon.verifySign(paramModel.getToken(), false);
+            if (signModel == null) {
+                return responseFormat.formationResultToString(ResponseResultCode.ErrorSignToken, "no authorize");
+            }
 
             //判断是否有分页
             if ((paramModel.db_pageNum != -1 && paramModel.db_pageSize != -1) || (paramModel.db_skipNum != -1 && paramModel.db_topNum != -1)) {
@@ -101,22 +92,8 @@ public class AutoODataController {
             }
             //执行sql查询
             resultParam = DBHelper.ExecuteSqlSelect(paramModel.rsid, sqlStr);
-            List<Map<String, String>> resultMap = DBHelper.ExecuteSqlSelectReturnMap(paramModel.rsid, sqlStr);
-            String rowCounts = null;
             if (sqlStr1 != null) {
                 resultParam1 = DBHelper.ExecuteSqlSelect(paramModel.rsid, sqlStr1);
-                rowCounts = DBHelper.ExecuteSqlSelectOne(paramModel.rsid, sqlStr1);
-            }
-            ObjectMapper objectMapper = new ObjectMapper();
-            ObjectNode node = objectMapper.createObjectNode();
-            String result = objectMapper.writeValueAsString(resultMap);
-            ArrayNode arrayNode1 = objectMapper.readValue(result, ArrayNode.class);
-            node.put(paramModel.db_tableName, arrayNode1);
-            node.put("rowsCount", rowCounts);
-            if (result != null) {
-                //return node.toString();
-                //return responseFormat.formationResultToString(ResponseResultCode.Success, "null", node);
-
             }
             if (resultParam.ResultCode >= 0) {
                 if (resultParam1 != null && resultParam1.ResultCode >= 0) {
@@ -125,38 +102,39 @@ public class AutoODataController {
                     JSONObject rowsCount = (JSONObject) iterator.next();
                     resultParam.ResultJsonObject.accumulate("rowsCount", rowsCount.getString("rowsCount"));
                 }
-                //return formationResult.formationResult(ResponseResultCode.Success, new ExecuteResultParam(resultParam.ResultJsonObject));
+                return responseFormat.formationSuccessResultToString(resultParam.ResultJsonObject);
             } else {
-                //return responseFormat.formationResultToString(ResponseResultCode.Error, resultParam.errMsg);
+                return responseFormat.formationResultToString(ResponseResultCode.Error, resultParam.errMsg);
             }
-
-            return node;
         } catch (Exception e) {
-            //return responseFormat.formationResultToString(ResponseResultCode.Error, e.getLocalizedMessage());
-            return null;
+            return responseFormat.formationResultToString(ResponseResultCode.Error, e.getLocalizedMessage());
         } finally {
-//            if (paramModel != null) {
-//                paramModel.destroySelf();
-//            }
+            if (paramModel != null) {
+                paramModel.destroySelf();
+            }
             UtileSmart.FreeObjects(resultParam, resultParam1, paramModel, sqlStr, sqlStr1);
         }
     }
 
     @RequestMapping(value = "/SelectModelCount", method = RequestMethod.POST, consumes = {MediaType.APPLICATION_JSON_VALUE}, produces = {MediaType.APPLICATION_JSON_VALUE})
-    public String SelectModelCount(@RequestBody ReviveRSParamModel paramModel) {
+    public String SelectModelCount(@RequestBody String param) {
         ExecuteResultParam resultParam = null;
         String sqlStr = null;
-        try {
 
-//            boolean isSignOn = com.smart.common.VerificationSign.verificationSignOn(paramModel.token, paramModel.rsid);
-//            if (!isSignOn) {
-//                return formationResult.formationResult(ResponseResultCode.Error, new ExecuteResultParam("请您先登录系统。", param));
-//            }
+        ReviveRSParamModel paramModel = null;
+        try {
+            paramModel = analyzeParamModel.transferReviveRSParamModel(param, OperateTypeEnum.select);
+
+            SignInformationModel signModel = SignCommon.verifySign(paramModel.getToken(), false);
+            if (signModel == null) {
+                return responseFormat.formationResultToString(ResponseResultCode.ErrorSignToken, "no authorize");
+            }
+
             sqlStr = DBHelper.SqlSelectCountFactory(paramModel);
             //执行sql查询
             resultParam = DBHelper.ExecuteSqlSelect(paramModel.rsid, sqlStr);
             if (resultParam.ResultCode >= 0) {
-                return formationResult.formationResult(ResponseResultCode.Success, new ExecuteResultParam(resultParam.ResultJsonObject));
+                return responseFormat.formationSuccessResultToString(resultParam.ResultJsonObject);
             } else {
                 return responseFormat.formationResultToString(ResponseResultCode.Error, resultParam.errMsg);
             }
@@ -171,19 +149,21 @@ public class AutoODataController {
     }
 
     @RequestMapping(value = "/UpdateModel", method = RequestMethod.POST, consumes = {MediaType.APPLICATION_JSON_VALUE}, produces = {MediaType.APPLICATION_JSON_VALUE})
-    public String UpdateModel(@RequestBody ReviveRSParamModel paramModel) {
+    public String UpdateModel(@RequestBody String param) {
         ExecuteResultParam resultParam = null;
+        ReviveRSParamModel paramModel = null;
         try {
+            paramModel = analyzeParamModel.transferReviveRSParamModel(param, OperateTypeEnum.update);
 
-//            boolean isSignOn = com.smart.common.VerificationSign.verificationSignOn(paramModel.token, paramModel.rsid);
-//            if (!isSignOn) {
-//                return formationResult.formationResult(ResponseResultCode.Error, new ExecuteResultParam("请您先登录系统。", param));
-//            }
+            SignInformationModel signModel = SignCommon.verifySign(paramModel.getToken(), false);
+            if (signModel == null) {
+                return responseFormat.formationResultToString(ResponseResultCode.ErrorSignToken, "no authorize");
+            }
             resultParam = DBHelper.ExecuteSql(paramModel.rsid, DBHelper.SqlUpdateFactory(paramModel));
 
             if (resultParam.ResultCode >= 0) {
                 //JMSQueueMessage.AsyncWriteMessage(paramModel.db_tableName, 2, paramModel.pkValues);
-                return formationResult.formationResult(ResponseResultCode.Success, new ExecuteResultParam());
+                return responseFormat.formationSuccessResultToString(resultParam.ResultJsonObject);
             } else {
                 return responseFormat.formationResultToString(ResponseResultCode.Error, resultParam.errMsg);
             }
@@ -199,17 +179,20 @@ public class AutoODataController {
     }
 
     @RequestMapping(value = "/DeleteModel", method = RequestMethod.POST, consumes = {MediaType.APPLICATION_JSON_VALUE}, produces = {MediaType.APPLICATION_JSON_VALUE})
-    public String DeleteModel(@RequestBody ReviveRSParamModel paramModel) {
+    public String DeleteModel(@RequestBody String param) {
         ExecuteResultParam resultParam = null;
+        ReviveRSParamModel paramModel = null;
         try {
+            paramModel = analyzeParamModel.transferReviveRSParamModel(param, OperateTypeEnum.delete);
 
-//            boolean isSignOn = com.smart.common.VerificationSign.verificationSignOn(paramModel.token, paramModel.rsid);
-//            if (!isSignOn) {
-//                return formationResult.formationResult(ResponseResultCode.Error, new ExecuteResultParam("请您先登录系统。", param));
-//            }
+            SignInformationModel signModel = SignCommon.verifySign(paramModel.getToken(), false);
+            if (signModel == null) {
+                return responseFormat.formationResultToString(ResponseResultCode.ErrorSignToken, "no authorize");
+            }
+
             resultParam = DBHelper.ExecuteSql(paramModel.rsid, DBHelper.SqlDeleteFactory(paramModel));
             if (resultParam.ResultCode >= 0) {
-                return formationResult.formationResult(ResponseResultCode.Success, new ExecuteResultParam());
+                return responseFormat.formationSuccessResultToString(resultParam.ResultJsonObject);
             } else {
                 return responseFormat.formationResultToString(ResponseResultCode.Error, resultParam.errMsg);
             }
@@ -224,15 +207,18 @@ public class AutoODataController {
     }
 
     @RequestMapping(value = "/InsertModel", method = RequestMethod.POST, consumes = {MediaType.APPLICATION_JSON_VALUE}, produces = {MediaType.APPLICATION_JSON_VALUE})
-    public String InsertModel(@RequestBody ReviveRSParamModel paramModel) {
+    public String InsertModel(@RequestBody String param) {
         ExecuteResultParam resultParam = null;
         SqlFactoryResultModel sqlResultModel = null;
+        ReviveRSParamModel paramModel = null;
         try {
+            paramModel = analyzeParamModel.transferReviveRSParamModel(param, OperateTypeEnum.insert);
+            
+            SignInformationModel signModel = SignCommon.verifySign(paramModel.getToken(), false);
+            if (signModel == null) {
+                return responseFormat.formationResultToString(ResponseResultCode.ErrorSignToken, "no authorize");
+            }
 
-//            boolean isSignOn = com.smart.common.VerificationSign.verificationSignOn(paramModel.token, paramModel.rsid);
-//            if (!isSignOn) {
-//                return formationResult.formationResult(ResponseResultCode.Error, new ExecuteResultParam("请您先登录系统。", param));
-//            }
             sqlResultModel = DBHelper.SqlInsertFactory(paramModel);
             //如果有identity 开始的sql语句以 SET NOCOUNT  ON 开始 执行查询方法
             if (sqlResultModel.strSql.startsWith("SET NOCOUNT ON")) {
@@ -254,7 +240,7 @@ public class AutoODataController {
                     }
                     resultParam.ResultJsonObject.accumulate(DeployInfo.ResultDataTag, resultJson);
                 }
-                return formationResult.formationResult(ResponseResultCode.Success, new ExecuteResultParam(resultParam.ResultJsonObject));
+                return responseFormat.formationSuccessResultToString(resultParam.ResultJsonObject);
             } else {
                 return responseFormat.formationResultToString(ResponseResultCode.Error, resultParam.errMsg);
             }

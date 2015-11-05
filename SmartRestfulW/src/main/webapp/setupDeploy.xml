@@ -8,11 +8,11 @@
         <dbUser>sa</dbUser>
         <dbpwd>123456</dbpwd>
     </systemSet>
-    <systemSet id="mls">
-        <dbType>mssql</dbType>
-        <dbAddress>192.168.169.227</dbAddress>
-        <dbPort>1433</dbPort>
-        <dbName>mls</dbName>
+    <systemSet id="ReviveSmartDB">
+        <dbType>sybase</dbType>
+        <dbAddress>192.168.100.64</dbAddress>
+        <dbPort>5000</dbPort>
+        <dbName>ReviveSmartDB</dbName>
         <dbUser>sa</dbUser>
         <dbpwd>123456</dbpwd>
     </systemSet>
