@@ -7,6 +7,7 @@ package com.smart.smartrestfulw.controller;
 
 import com.smart.common.DBHelper;
 import com.smart.common.DeployInfo;
+import com.smart.common.PoiExcelHelper;
 import com.smart.common.SignVerify.SignCommon;
 import com.smart.common.SignVerify.SignInformationModel;
 import com.smart.common.model.ExecuteResultParam;
@@ -16,7 +17,10 @@ import com.smart.common.model.OperateTypeEnum;
 import com.smart.common.model.ReviveRSParamModel;
 import com.smart.common.model.SqlFactoryResultModel;
 import com.smart.smartrestfulw.prepare.ReponseFormat;
+import java.io.File;
 import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
 
@@ -213,7 +217,7 @@ public class AutoODataController {
         ReviveRSParamModel paramModel = null;
         try {
             paramModel = analyzeParamModel.transferReviveRSParamModel(param, OperateTypeEnum.insert);
-            
+
             SignInformationModel signModel = SignCommon.verifySign(paramModel.getToken(), false);
             if (signModel == null) {
                 return responseFormat.formationResultToString(ResponseResultCode.ErrorSignToken, "no authorize");
@@ -251,6 +255,54 @@ public class AutoODataController {
                 paramModel.destroySelf();
             }
             UtileSmart.FreeObjects(resultParam, paramModel, sqlResultModel);
+        }
+    }
+
+    @RequestMapping(value = "/ExportExcel", method = RequestMethod.POST, consumes = {MediaType.APPLICATION_JSON_VALUE}, produces = {MediaType.APPLICATION_JSON_VALUE})
+    public String ExportExcel(String param) {
+        ReviveRSParamModel paramModel = null;
+        String sqlStr = null, sqlStr1 = null;
+
+        try {
+            paramModel = analyzeParamModel.transferReviveRSParamModel(param, OperateTypeEnum.exportExcel);
+
+            SignInformationModel signModel = SignCommon.verifySign(paramModel.getToken(), false);
+            if (signModel == null) {
+                return responseFormat.formationResultToString(ResponseResultCode.ErrorSignToken, "no authorize");
+            }
+
+            //判断是否有分页
+            if ((paramModel.db_pageNum != -1 && paramModel.db_pageSize != -1) || (paramModel.db_skipNum != -1 && paramModel.db_topNum != -1)) {
+                //调用分页的sql语句构造
+                sqlStr = DBHelper.SqlSelectPageFactory(paramModel);
+            } else {
+                sqlStr = DBHelper.SqlSelectFactory(paramModel);
+            }
+            //执行sql查询
+            List<Map<String, String>> resultMap = DBHelper.ExecuteSqlSelectReturnMap(paramModel.rsid, sqlStr);
+
+            if (resultMap != null) {
+                String FileName = UtileSmart.getUUID() + ".xls";
+                StringBuffer exportExcelFilePath = new StringBuffer().append(DeployInfo.GetDeployTempFilePath()).append(File.separator).append(FileName);
+
+                File exportExcelFile = new File(exportExcelFilePath.toString());
+                System.out.println(exportExcelFilePath);
+                PoiExcelHelper.productExcelFile(resultMap, paramModel.db_exportColumns, paramModel.db_tableName, exportExcelFile);
+                JSONObject jsonObject = new JSONObject();
+                jsonObject.put("file", DeployInfo.GetHttpPath() + "/TempFile/" + FileName);
+                //return formationResult.formationResult(ResponseResultCode.Success, new ExecuteResultParam(jsonObject));
+                return responseFormat.formationSuccessResultToString(jsonObject);
+
+            } else {
+                return responseFormat.formationResultToString(ResponseResultCode.Error, "unknow error.");
+            }
+        } catch (Exception e) {
+            return responseFormat.formationResultToString(ResponseResultCode.Error, e);
+        } finally {
+            if (paramModel != null) {
+                paramModel.destroySelf();
+            }
+            UtileSmart.FreeObjects(paramModel, param, sqlStr, sqlStr1);
         }
     }
 }
